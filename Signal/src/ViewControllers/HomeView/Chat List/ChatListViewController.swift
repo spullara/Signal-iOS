@@ -313,6 +313,8 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
         super.viewIsAppearing(animated)
 
         updateFilterControl(animated: false)
+        // The split view may already be expanded at launch, which sends no expand callback.
+        updateAvatarOnlySidebar(animated: false)
     }
 
     override func viewDidLayoutSubviews() {
