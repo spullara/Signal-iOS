@@ -1326,6 +1326,38 @@ class HomeTabSplitViewController: UISplitViewController, UISplitViewControllerDe
         }
     }
 
+    private var defaultPrimaryColumnWidths: (minimum: CGFloat, maximum: CGFloat, fraction: CGFloat)?
+
+    /// Narrows the primary column to `width`, or restores its default size when `width` is `nil`.
+    func setPrimaryColumnFixedWidth(_ width: CGFloat?, animated: Bool) {
+        let apply = {
+            if let width {
+                if self.defaultPrimaryColumnWidths == nil {
+                    self.defaultPrimaryColumnWidths = (
+                        self.minimumPrimaryColumnWidth,
+                        self.maximumPrimaryColumnWidth,
+                        self.preferredPrimaryColumnWidthFraction,
+                    )
+                }
+                self.minimumPrimaryColumnWidth = width
+                self.maximumPrimaryColumnWidth = width
+                self.preferredPrimaryColumnWidth = width
+            } else if let defaults = self.defaultPrimaryColumnWidths {
+                self.defaultPrimaryColumnWidths = nil
+                self.preferredPrimaryColumnWidth = UISplitViewController.automaticDimension
+                self.minimumPrimaryColumnWidth = defaults.minimum
+                self.maximumPrimaryColumnWidth = defaults.maximum
+                self.preferredPrimaryColumnWidthFraction = defaults.fraction
+            }
+            self.view.layoutIfNeeded()
+        }
+        if animated, view.window != nil {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: apply)
+        } else {
+            apply()
+        }
+    }
+
     fileprivate func scrollPrimaryViewControllerToTop(animated: Bool) {
         guard let homeTabViewController else {
             owsFailDebug("Could not find homeTabViewController")
@@ -1464,6 +1496,8 @@ class HomeTabSplitViewController: UISplitViewController, UISplitViewControllerDe
             homeTabViewController.updateSettingsBarButtonItem()
         }
 
+        (homeTabViewController as? ChatListViewController)?.updateAvatarOnlySidebar(animated: false)
+
         // Tab bar is not always visible in a collapsed split view controller.
         if homeTabBarController?.selectedSplitViewController === svc {
             updateTabBar()
@@ -1480,6 +1514,8 @@ class HomeTabSplitViewController: UISplitViewController, UISplitViewControllerDe
         {
             homeTabViewController.updateSettingsBarButtonItem()
         }
+
+        (homeTabViewController as? ChatListViewController)?.updateAvatarOnlySidebar(animated: false)
 
         // Tab bar is always visible in expanded split view controller.
         if homeTabBarController?.selectedSplitViewController === svc {

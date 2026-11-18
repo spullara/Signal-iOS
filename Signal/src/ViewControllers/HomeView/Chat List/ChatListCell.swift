@@ -39,6 +39,17 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
     /// If set to `true` background in `selected` state would have rounded corners.
     var useSidebarAppearance = false
 
+    /// If set to `true` only the avatar is shown, centered in the cell.
+    var showsAvatarOnly = false {
+        didSet {
+            guard showsAvatarOnly != oldValue else { return }
+            applyAvatarOnlyLayout()
+        }
+    }
+
+    private var fullLayoutConstraints = [NSLayoutConstraint]()
+    private var avatarOnlyLayoutConstraints = [NSLayoutConstraint]()
+
     private struct ReuseToken {
         let hasVerifiedBadge: Bool
         let hasMuteIndicator: Bool
@@ -168,20 +179,53 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
         outerHStack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addConstraints([
             outerHStack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            outerHStack.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
-            outerHStack.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
             outerHStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
+        fullLayoutConstraints = [
+            outerHStack.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
+            outerHStack.trailingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.trailingAnchor),
+        ]
+        // Keep the full layout width so text lays out normally (hidden and clipped),
+        // and offset the stack so that the avatar is centered.
+        let halfAvatar = CGFloat(Self.avatarSize) / 2
+        avatarOnlyLayoutConstraints = [
+            outerHStack.leadingAnchor.constraint(
+                equalTo: contentView.centerXAnchor,
+                constant: CurrentAppContext().isRTL ? halfAvatar : -halfAvatar,
+            ),
+            outerHStack.widthAnchor.constraint(equalToConstant: 320),
+        ]
+        NSLayoutConstraint.activate(fullLayoutConstraints)
 
         selectionStyle = .default
         automaticallyUpdatesBackgroundConfiguration = false
     }
 
+    private func applyAvatarOnlyLayout() {
+        if showsAvatarOnly {
+            NSLayoutConstraint.deactivate(fullLayoutConstraints)
+            NSLayoutConstraint.activate(avatarOnlyLayoutConstraints)
+        } else {
+            NSLayoutConstraint.deactivate(avatarOnlyLayoutConstraints)
+            NSLayoutConstraint.activate(fullLayoutConstraints)
+        }
+        vStack.alpha = showsAvatarOnly ? 0 : 1
+        contentView.clipsToBounds = showsAvatarOnly
+        accessibilityLabel = showsAvatarOnly ? nameLabel.text : nil
+        setNeedsUpdateConfiguration()
+    }
+
+    /// Width of the primary column that fits a cell in avatar-only mode.
+    static var avatarOnlyColumnWidth: CGFloat { CGFloat(avatarSize) + 40 }
+
     override func updateConfiguration(using state: UICellConfigurationState) {
         var configuration = UIBackgroundConfiguration.clear().updated(for: state)
         if state.isSelected || state.isHighlighted {
             configuration.backgroundColor = OWSTableViewController2.cellSelectedBackgroundColor
-            if useSidebarAppearance {
+            if showsAvatarOnly {
+                configuration.backgroundInsets = .init(top: 4, leading: 8, bottom: 4, trailing: 8)
+                configuration.cornerRadius = 20
+            } else if useSidebarAppearance {
                 let contentMargin: CGFloat = 12
                 let leading = directionalLayoutMargins.leading - contentMargin
                 let trailing = directionalLayoutMargins.trailing - contentMargin
@@ -556,6 +600,10 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
         }
 
         self.reuseToken = newReuseToken
+
+        if showsAvatarOnly {
+            accessibilityLabel = nameLabel.text
+        }
     }
 
     // MARK: - Stack Configs

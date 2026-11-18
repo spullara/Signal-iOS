@@ -18,6 +18,10 @@ extension ChatListViewController: OWSNavigationChildController {
             return
         }
 
+        if isAvatarOnlySidebar {
+            setPrefersAvatarOnlySidebar(false)
+        }
+
         searchBar.becomeFirstResponder()
     }
 

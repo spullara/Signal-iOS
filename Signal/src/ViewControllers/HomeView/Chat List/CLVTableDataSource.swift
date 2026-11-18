@@ -47,6 +47,9 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
     /// Used to let chat list cells know when they should use rounded corners for background in `selected` state,
     var useSideBarListCellAppearance: Bool = false
 
+    /// Shows only avatars for chats and hides all other rows and section titles.
+    var showsAvatarsOnly: Bool = false
+
     /// While table view selection is changing, i.e., between
     /// `tableView(_:willSelectRowAt:)` and `tableView(_:didSelectRowAt:)`,
     /// records the identifier of the newly selected thread, or `nil` if
@@ -298,7 +301,7 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
         // Without returning a header with a non-zero height, Grouped
         // table view will use a default spacing between sections. We
         // do not want that spacing so we use the smallest possible height.
-        return section.title == nil ? .leastNormalMagnitude : UITableView.automaticDimension
+        return section.title == nil || showsAvatarsOnly ? .leastNormalMagnitude : UITableView.automaticDimension
     }
 
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
@@ -309,7 +312,7 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        guard let title = renderState.sections[section].title else { return UIView() }
+        guard let title = renderState.sections[section].title, !showsAvatarsOnly else { return UIView() }
 
         let container = UIView()
         container.layoutMargins = UIEdgeInsets(top: 14, leading: 16, bottom: 8, trailing: 16)
@@ -575,7 +578,7 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         switch renderState.sections[indexPath.section].type {
         case .reminders, .archiveButton, .inboxFilterFooter, .backupExportProgressView, .backupDownloadProgressView, .localFileBackupRestoreProgressView, .localFileBackupExportProgressView:
-            return UITableView.automaticDimension
+            return showsAvatarsOnly ? 0 : UITableView.automaticDimension
         case .pinned, .unpinned:
             return measureConversationCell(tableView: tableView, indexPath: indexPath)
         }
@@ -619,6 +622,7 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
         }
 
         cell.tintColor = .Signal.accent
+        cell.isHidden = showsAvatarsOnly && !(cell is ChatListCell)
         return cell
     }
 
@@ -650,6 +654,7 @@ class CLVTableDataSource: NSObject, UITableViewDataSource, UITableViewDelegate {
         let cell = tableView.dequeueReusableCell(ChatListCell.self, for: indexPath)
         cell.configure(cellContentToken: contentToken, spoilerAnimationManager: viewState.spoilerAnimationManager)
         cell.useSidebarAppearance = useSideBarListCellAppearance
+        cell.showsAvatarOnly = showsAvatarsOnly
 
         if
             let homeTabBarController = viewController?.homeTabBarController,

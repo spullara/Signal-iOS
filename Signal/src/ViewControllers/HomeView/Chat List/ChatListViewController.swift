@@ -127,6 +127,7 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
         updatePaymentReminderView()
         updateUsernameReminderView()
         updateListCellAppearance()
+        updateAvatarOnlySidebar(animated: false)
         observeNotifications()
     }
 
@@ -782,11 +783,16 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
     func updateSettingsBarButtonItem() {
         guard viewState.chatListMode == .inbox, !viewState.multiSelectState.isActive else { return }
 
-        navigationItem.leftBarButtonItem = settingsBarButtonItem()
+        navigationItem.leftBarButtonItem = isAvatarOnlySidebar ? avatarOnlySidebarToggleItem() : settingsBarButtonItem()
     }
 
     private func updateRightBarButtonItems() {
         guard viewState.chatListMode == .inbox, !viewState.multiSelectState.isActive else { return }
+
+        guard !isAvatarOnlySidebar else {
+            navigationItem.rightBarButtonItems = []
+            return
+        }
 
         var rightBarButtonItems = [UIBarButtonItem]()
 
@@ -814,7 +820,79 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
             rightBarButtonItems.append(proxyButton)
         }
 
+        if canShowAvatarOnlySidebar {
+            rightBarButtonItems.append(avatarOnlySidebarToggleItem())
+        }
+
         navigationItem.rightBarButtonItems = rightBarButtonItems
+    }
+
+    // MARK: Avatar-only sidebar
+
+    private static let prefersAvatarOnlySidebarKey = "ChatListPrefersAvatarOnlySidebar"
+
+    private var prefersAvatarOnlySidebar: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.prefersAvatarOnlySidebarKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.prefersAvatarOnlySidebarKey) }
+    }
+
+    /// The chat list can only collapse to avatars when it is the inbox in an expanded split view.
+    private var canShowAvatarOnlySidebar: Bool {
+        guard viewState.chatListMode == .inbox, let splitViewController else { return false }
+        return !splitViewController.isCollapsed
+    }
+
+    private(set) var isAvatarOnlySidebar = false
+
+    private func avatarOnlySidebarToggleItem() -> UIBarButtonItem {
+        let isCollapsing = !isAvatarOnlySidebar
+        let item = UIBarButtonItem(
+            image: UIImage(systemName: "sidebar.left"),
+            primaryAction: UIAction { [weak self] _ in
+                self?.setPrefersAvatarOnlySidebar(isCollapsing)
+            },
+        )
+        item.accessibilityLabel = isCollapsing
+            ? OWSLocalizedString("CHAT_LIST_COLLAPSE_SIDEBAR", comment: "Accessibility label for the button that collapses the chat list to show only avatars.")
+            : OWSLocalizedString("CHAT_LIST_EXPAND_SIDEBAR", comment: "Accessibility label for the button that expands the chat list to show full chat details.")
+        return item
+    }
+
+    func setPrefersAvatarOnlySidebar(_ prefersAvatarOnly: Bool) {
+        prefersAvatarOnlySidebar = prefersAvatarOnly
+        updateAvatarOnlySidebar(animated: true)
+    }
+
+    func updateAvatarOnlySidebar(animated: Bool) {
+        guard isViewLoaded else { return }
+
+        let shouldShowAvatarOnly = canShowAvatarOnlySidebar && prefersAvatarOnlySidebar
+        guard shouldShowAvatarOnly != isAvatarOnlySidebar else {
+            updateBarButtonItems()
+            return
+        }
+        isAvatarOnlySidebar = shouldShowAvatarOnly
+
+        if shouldShowAvatarOnly {
+            cancelSearch()
+            if viewState.multiSelectState.isActive {
+                leaveMultiselectMode()
+            }
+        }
+
+        navigationItem.searchController = shouldShowAvatarOnly ? nil : viewState.searchController
+        navigationItem.title = shouldShowAvatarOnly ? "" : nil
+        viewState.chatFolderPickerView.isHidden = shouldShowAvatarOnly || !renderState.viewInfo.hasChatFolderPicker
+        view.setNeedsLayout()
+        updateBarButtonItems()
+
+        tableDataSource.showsAvatarsOnly = shouldShowAvatarOnly
+        reloadTableData()
+
+        (splitViewController as? HomeTabSplitViewController)?.setPrimaryColumnFixedWidth(
+            shouldShowAvatarOnly ? ChatListCell.avatarOnlyColumnWidth : nil,
+            animated: animated,
+        )
     }
 
     func showNewConversationView() {
@@ -946,7 +1024,7 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
             firstConversationCueView.isHidden = true
         }
 
-        let isChatFolderPickerHidden = !renderState.viewInfo.hasChatFolderPicker
+        let isChatFolderPickerHidden = !renderState.viewInfo.hasChatFolderPicker || isAvatarOnlySidebar
         if viewState.chatFolderPickerView.isHidden != isChatFolderPickerHidden {
             viewState.chatFolderPickerView.isHidden = isChatFolderPickerHidden
             view.setNeedsLayout()
