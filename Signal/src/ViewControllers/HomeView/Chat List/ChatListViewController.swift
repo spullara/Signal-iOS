@@ -127,7 +127,6 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
         updatePaymentReminderView()
         updateUsernameReminderView()
         updateListCellAppearance()
-        updateAvatarOnlySidebar(animated: false)
         observeNotifications()
     }
 
@@ -839,23 +838,25 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
     private static let isIPadMini: Bool = {
         guard let model = String(sysctlKey: "hw.machine") else { return false }
         let miniModels: Set<String> = [
-            "iPad11,1", "iPad11,2", // 5th generation
-            "iPad14,1", "iPad14,2", // 6th generation
-            "iPad16,1", "iPad16,2", // A17 Pro
+            "iPad11,1", "iPad11,2",
+            "iPad14,1", "iPad14,2",
+            "iPad16,1", "iPad16,2",
             "iPad19,1", "iPad19,2",
         ]
         return miniModels.contains(model)
     }()
 
+    private var prefersAvatarOnlySidebarKey: String {
+        isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
+    }
+
     /// Saved per orientation. Defaults to avatar-only in portrait on iPad mini, otherwise full.
     private var prefersAvatarOnlySidebar: Bool {
         get {
-            let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
-            return UserDefaults.standard.object(forKey: key) as? Bool ?? (isPortraitLayout && Self.isIPadMini)
+            UserDefaults.standard.object(forKey: prefersAvatarOnlySidebarKey) as? Bool ?? (isPortraitLayout && Self.isIPadMini)
         }
         set {
-            let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
-            UserDefaults.standard.set(newValue, forKey: key)
+            UserDefaults.standard.set(newValue, forKey: prefersAvatarOnlySidebarKey)
         }
     }
 
@@ -905,8 +906,7 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
 
         navigationItem.searchController = shouldShowAvatarOnly ? nil : viewState.searchController
         navigationItem.title = shouldShowAvatarOnly ? "" : nil
-        viewState.chatFolderPickerView.isHidden = shouldShowAvatarOnly || !renderState.viewInfo.hasChatFolderPicker
-        view.setNeedsLayout()
+        updateChatFolderPickerVisibility()
         updateBarButtonItems()
 
         tableDataSource.showsAvatarsOnly = shouldShowAvatarOnly
@@ -1047,6 +1047,10 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
             firstConversationCueView.isHidden = true
         }
 
+        updateChatFolderPickerVisibility()
+    }
+
+    private func updateChatFolderPickerVisibility() {
         let isChatFolderPickerHidden = !renderState.viewInfo.hasChatFolderPicker || isAvatarOnlySidebar
         if viewState.chatFolderPickerView.isHidden != isChatFolderPickerHidden {
             viewState.chatFolderPickerView.isHidden = isChatFolderPickerHidden
