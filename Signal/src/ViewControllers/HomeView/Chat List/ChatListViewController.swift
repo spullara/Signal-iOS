@@ -829,11 +829,21 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
 
     // MARK: Avatar-only sidebar
 
-    private static let prefersAvatarOnlySidebarKey = "ChatListPrefersAvatarOnlySidebar"
+    private var isPortraitLayout: Bool {
+        let size = view.window?.bounds.size ?? splitViewController?.view.bounds.size ?? view.bounds.size
+        return size.height > size.width
+    }
 
+    /// Saved per orientation. Defaults to avatar-only in portrait and full in landscape.
     private var prefersAvatarOnlySidebar: Bool {
-        get { UserDefaults.standard.bool(forKey: Self.prefersAvatarOnlySidebarKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.prefersAvatarOnlySidebarKey) }
+        get {
+            let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
+            return UserDefaults.standard.object(forKey: key) as? Bool ?? isPortraitLayout
+        }
+        set {
+            let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
+            UserDefaults.standard.set(newValue, forKey: key)
+        }
     }
 
     /// The chat list can only collapse to avatars when it is the inbox in an expanded split view.

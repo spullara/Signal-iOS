@@ -1427,6 +1427,14 @@ class HomeTabSplitViewController: UISplitViewController, UISplitViewControllerDe
         updateTabBar(animated: animated) // covers tab switches
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        // The chat list collapses to avatars by default in portrait, so re-check after rotation.
+        coordinator.animate(alongsideTransition: nil) { _ in
+            (self.homeTabViewController as? ChatListViewController)?.updateAvatarOnlySidebar(animated: true)
+        }
+    }
+
     // MARK: - UISplitViewControllerDelegate
 
     func splitViewController(
