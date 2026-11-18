@@ -836,11 +836,22 @@ class ChatListViewController: OWSViewController, HomeTabViewController {
         return size.height > size.width
     }
 
-    /// Saved per orientation. Defaults to avatar-only in portrait and full in landscape.
+    private static let isIPadMini: Bool = {
+        guard let model = String(sysctlKey: "hw.machine") else { return false }
+        let miniModels: Set<String> = [
+            "iPad11,1", "iPad11,2", // 5th generation
+            "iPad14,1", "iPad14,2", // 6th generation
+            "iPad16,1", "iPad16,2", // A17 Pro
+            "iPad19,1", "iPad19,2",
+        ]
+        return miniModels.contains(model)
+    }()
+
+    /// Saved per orientation. Defaults to avatar-only in portrait on iPad mini, otherwise full.
     private var prefersAvatarOnlySidebar: Bool {
         get {
             let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
-            return UserDefaults.standard.object(forKey: key) as? Bool ?? isPortraitLayout
+            return UserDefaults.standard.object(forKey: key) as? Bool ?? (isPortraitLayout && Self.isIPadMini)
         }
         set {
             let key = isPortraitLayout ? "ChatListPrefersAvatarOnlySidebarPortrait" : "ChatListPrefersAvatarOnlySidebarLandscape"
