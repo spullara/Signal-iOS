@@ -50,6 +50,11 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
     private var fullLayoutConstraints = [NSLayoutConstraint]()
     private var avatarOnlyLayoutConstraints = [NSLayoutConstraint]()
 
+    /// Unread count shown over the avatar in avatar-only mode. `nil` when there is nothing unread.
+    private var unreadBadgeText: String?
+    private let avatarUnreadBadge = UIView()
+    private let avatarUnreadLabel = UILabel()
+
     private struct ReuseToken {
         let hasVerifiedBadge: Bool
         let hasMuteIndicator: Bool
@@ -197,6 +202,8 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
         ]
         NSLayoutConstraint.activate(fullLayoutConstraints)
 
+        setUpAvatarUnreadBadge()
+
         selectionStyle = .default
         automaticallyUpdatesBackgroundConfiguration = false
     }
@@ -212,7 +219,56 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
         vStack.alpha = showsAvatarOnly ? 0 : 1
         contentView.clipsToBounds = showsAvatarOnly
         accessibilityLabel = showsAvatarOnly ? nameLabel.text : nil
+        updateAvatarUnreadBadge()
         setNeedsUpdateConfiguration()
+    }
+
+    private func setUpAvatarUnreadBadge() {
+        avatarUnreadLabel.font = Self.unreadFont
+        avatarUnreadLabel.textColor = .white
+        avatarUnreadLabel.textAlignment = .center
+        avatarUnreadBadge.backgroundColor = .Signal.accent
+        avatarUnreadBadge.layer.borderWidth = 2
+        avatarUnreadBadge.isHidden = true
+
+        avatarUnreadBadge.addSubview(avatarUnreadLabel)
+        contentView.addSubview(avatarUnreadBadge)
+        avatarUnreadBadge.translatesAutoresizingMaskIntoConstraints = false
+        avatarUnreadLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        // Center the badge on the avatar's circle at its top-trailing 45° point.
+        let cornerOffset = (CGFloat(Self.avatarSize) / 2 * 0.7).rounded()
+        let hugWidth = avatarUnreadBadge.widthAnchor.constraint(equalToConstant: 0)
+        hugWidth.priority = .defaultLow
+        NSLayoutConstraint.activate([
+            avatarUnreadLabel.centerXAnchor.constraint(equalTo: avatarUnreadBadge.centerXAnchor),
+            avatarUnreadLabel.centerYAnchor.constraint(equalTo: avatarUnreadBadge.centerYAnchor),
+            avatarUnreadBadge.heightAnchor.constraint(equalTo: avatarUnreadLabel.heightAnchor, constant: 6),
+            avatarUnreadBadge.widthAnchor.constraint(greaterThanOrEqualTo: avatarUnreadBadge.heightAnchor),
+            avatarUnreadBadge.widthAnchor.constraint(greaterThanOrEqualTo: avatarUnreadLabel.widthAnchor, constant: 12),
+            hugWidth,
+            avatarUnreadBadge.centerXAnchor.constraint(
+                equalTo: contentView.centerXAnchor,
+                constant: CurrentAppContext().isRTL ? -cornerOffset : cornerOffset,
+            ),
+            avatarUnreadBadge.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -cornerOffset),
+        ])
+    }
+
+    private func updateAvatarUnreadBadge() {
+        guard showsAvatarOnly, let unreadBadgeText else {
+            avatarUnreadBadge.isHidden = true
+            return
+        }
+        // A non-breaking space keeps the label's height, so "marked unread" shows as a dot.
+        avatarUnreadLabel.text = unreadBadgeText.isEmpty ? "\u{00A0}" : unreadBadgeText
+        avatarUnreadBadge.layer.borderColor = UIColor.Signal.background.resolvedColor(with: traitCollection).cgColor
+        avatarUnreadBadge.isHidden = false
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        avatarUnreadBadge.layer.cornerRadius = avatarUnreadBadge.bounds.height / 2
     }
 
     /// Width of the primary column that fits a cell in avatar-only mode.
@@ -600,6 +656,9 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
         }
 
         self.reuseToken = newReuseToken
+
+        unreadBadgeText = configuration.unreadIndicatorLabelConfig == nil ? nil : (unreadLabel.text ?? "")
+        updateAvatarUnreadBadge()
 
         if showsAvatarOnly {
             accessibilityLabel = nameLabel.text
@@ -990,6 +1049,8 @@ class ChatListCell: UITableViewCell, ReusableTableViewCell {
     func reset() {
         nextUpdateTimestamp = nil
         isCellVisible = false
+        unreadBadgeText = nil
+        avatarUnreadBadge.isHidden = true
 
         for cvView in [
             nameLabel,
